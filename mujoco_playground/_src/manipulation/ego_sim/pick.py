@@ -99,10 +99,14 @@ class RUMPickCube(rum.RUMGripper):
             .set(object_pos)
         )
 
-        data = mjx_env.init(
-            self._mjx_model,
-            init_q,
-            jp.zeros(self._mjx_model.nv, dtype=float),
+        data = mjx_env.make_data(
+            self._mj_model,
+            qpos=init_q,
+            qvel=jp.zeros(self._mjx_model.nv, dtype=float),
+            ctrl=self._init_ctrl,
+            impl=self._mjx_model.impl.value,
+            nconmax=self._config.nconmax,
+            njmax=self._config.njmax,
         )
 
         gripper_pos = data.site_xpos[self._gripper_site].copy()
