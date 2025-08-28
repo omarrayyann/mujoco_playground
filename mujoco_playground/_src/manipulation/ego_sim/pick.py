@@ -112,9 +112,7 @@ class RUMPickCube(rum.RUMGripper):
             "reached_box": 0.0,
             "initial_object_pos": object_pos,
             "gripper_pos": gripper_pos,
-            "current_grasp": jp.asarray(
-                0.0, dtype=float
-            ),  # Initialize as a scalar float
+            "current_grasp": 0.0,
         }
 
         obs = self._get_obs(data, info)
@@ -138,24 +136,20 @@ class RUMPickCube(rum.RUMGripper):
         )
 
         ctrl_grasp = jp.clip(
-            state.info["current_grasp"] + jp.squeeze(action[-1:]) * -0.1,
+            state.info["current_grasp"] + action[-1:] * -0.1,
             self._lower_grasp,
             self._upper_grasp,
         )
-        # Store as a scalar value to avoid dimension issues
-        state.info.update({"current_grasp": jp.asarray(ctrl_grasp, dtype=float)})
+        state.info.update({"current_grasp": jp.squeeze(ctrl_grasp)})
 
         data = mjx_env.step(self._mjx_model, data, ctrl_grasp, self.n_substeps)
 
         raw_rewards = self._get_reward(data, state.info)
 
-        reward_values = jp.array(
-            [
-                raw_rewards[k] * self._config.reward_config.scales[k]
-                for k in raw_rewards.keys()
-            ]
-        )
-        reward = jp.clip(jp.sum(reward_values), -1e4, 1e4)
+        reward = 0.0
+        for k, v in raw_rewards.items():
+            reward += v * self._config.reward_config.scales[k]
+        reward = jp.clip(reward, -1e4, 1e4)
 
         box_pos = data.xpos[self._obj_body]
         out_of_bounds = jp.any(jp.abs(box_pos) > 1.0)
@@ -163,7 +157,6 @@ class RUMPickCube(rum.RUMGripper):
         done = out_of_bounds | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
         done = done.astype(float)
 
-        # Get observations
         obs = self._get_obs(data, state.info)
         state = State(data, obs, reward, done, state.metrics, state.info)
 
@@ -198,7 +191,7 @@ class RUMPickCube(rum.RUMGripper):
         gripper_pos = data.site_xpos[self._gripper_site]
         obj_pos = data.xpos[self._obj_body]
         rel = obj_pos - gripper_pos
-        current_grasp = jp.array([info["current_grasp"]], dtype=float)
+        current_grasp = jp.array([info["current_grasp"]])
         obs = jp.concatenate([gripper_pos, obj_pos, rel, current_grasp])
         return obs
 
