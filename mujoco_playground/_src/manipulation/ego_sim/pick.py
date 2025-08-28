@@ -79,7 +79,7 @@ class RUMPickCube(rum.RUMGripper):
         self._sample_orientation = sample_orientation
 
         self._reward_scale = jp.array(5.0)
-        self._distance_threshold = jp.array(0.03)
+        self._distance_threshold = jp.array(0.02)
 
     def reset(self, rng: jax.Array) -> State:
         rng, rng_box = jax.random.split(rng, 2)
@@ -103,7 +103,7 @@ class RUMPickCube(rum.RUMGripper):
             self._mj_model,
             qpos=init_q,
             qvel=jp.zeros(self._mjx_model.nv, dtype=float),
-            impl=self._mjx_model.impl.value,
+            impl="warp",
             nconmax=self._config.nconmax,
             njmax=self._config.njmax,
         )
@@ -197,7 +197,8 @@ class RUMPickCube(rum.RUMGripper):
         obj_pos = data.xpos[self._obj_body]
         rel = obj_pos - gripper_pos
         target_rel = info["target_pos"] - data.xpos[self._obj_body]
-        obs = jp.concatenate([gripper_pos, obj_pos, rel, target_rel])
+        current_grasp = jp.array([info["current_grasp"]])
+        obs = jp.concatenate([gripper_pos, obj_pos, rel, target_rel, current_grasp])
         return obs
 
 
