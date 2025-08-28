@@ -10,7 +10,7 @@
         <flag eulerdamp="disable"/>
     </option> -->
 
-    <option iterations="10" ls_iterations="10" integrator="implicitfast" cone="elliptic">
+    <option iterations="30" ls_iterations="10" integrator="implicitfast" cone="elliptic">
         <flag eulerdamp="disable"/>
     </option>
 
@@ -61,7 +61,7 @@
 
         <body name="object_body" pos="0.0 0.3 0.78">
             <freejoint/>
-            <geom type="box" name="object_geom" size="0.02 0.02 0.05" condim="3" friction="1 .03 .003" rgba="0 1 0 1"
+            <geom type="box" name="object_geom" size="0.02 0.02 0.02" condim="3" friction="1 .03 .003" rgba="0 1 0 1"
                 contype="1" conaffinity="2" solref="0.01 1"/>
         </body>
 

@@ -30,7 +30,7 @@
     </default>
 
     <default class="friction">
-      <geom condim="6" friction="0.5 0.5 0.1" priority="1" solref="0.01 1" solimp="0.99 0.99 0.01" conaffinity="1"
+      <geom condim="6" friction="3.5 3.5 3.1" priority="1" solref="0.01 1" solimp="0.99 0.99 0.01" conaffinity="1"
         contype="1"/>
     </default>
 
@@ -105,6 +105,6 @@
     <position name="fingers_actuator" tendon="split" class="finger_actuator"/>
   </actuator>
   <equality>
-    <weld site1="target_ee_pose" site2="gripper" solref="0.05 1" solimp="0.8 0.95 0.01"/>
+    <weld site1="target_ee_pose" site2="gripper" solref="0.1 1" solimp="0.7 0.9 0.01"/>
   </equality>
 </mujoco>
