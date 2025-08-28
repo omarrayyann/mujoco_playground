@@ -251,7 +251,10 @@ def main(argv):
     if _VISION.value:
         env_cfg.vision = True
         env_cfg.vision_config.render_batch_size = ppo_params.num_envs
-    env = registry.load(_ENV_NAME.value, config=env_cfg)
+    config_overrides = {"impl": _IMPL.value}
+    env = registry.load(
+        _ENV_NAME.value, config=env_cfg, config_overrides=config_overrides
+    )
     if _RUN_EVALS.present:
         ppo_params.run_evals = _RUN_EVALS.value
     if _LOG_TRAINING_METRICS.present:
