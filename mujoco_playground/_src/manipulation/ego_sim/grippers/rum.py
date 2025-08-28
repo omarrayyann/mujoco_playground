@@ -41,7 +41,7 @@ def default_config() -> config_dict.ConfigDict:
         sim_dt=0.002,
         episode_length=200,
         action_repeat=1,
-        action_scale=0.01,
+        action_scale=0.02,
     )
 
 

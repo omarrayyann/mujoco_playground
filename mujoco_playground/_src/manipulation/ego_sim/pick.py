@@ -38,7 +38,7 @@ def default_config() -> config_dict.ConfigDict:
         sim_dt=0.002,
         episode_length=600,
         action_repeat=1,
-        action_scale=0.01,
+        action_scale=0.02,
         reward_config=config_dict.create(
             scales=config_dict.create(
                 # Gripper goes to the box.
