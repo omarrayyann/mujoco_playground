@@ -195,9 +195,8 @@ class RUMPickCube(rum.RUMGripper):
         gripper_pos = data.site_xpos[self._gripper_site]
         obj_pos = data.xpos[self._obj_body]
         rel = obj_pos - gripper_pos
-        target_rel = info["target_pos"] - data.xpos[self._obj_body]
         current_grasp = jp.array([info["current_grasp"]])
-        obs = jp.concatenate([gripper_pos, obj_pos, rel, target_rel, current_grasp])
+        obs = jp.concatenate([gripper_pos, obj_pos, rel, current_grasp])
         return obs
 
 
