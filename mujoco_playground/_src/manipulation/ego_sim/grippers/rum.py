@@ -42,6 +42,9 @@ def default_config() -> config_dict.ConfigDict:
         episode_length=200,
         action_repeat=1,
         action_scale=0.02,
+        impl="jax",
+        nconmax=12 * 8192,
+        njmax=44,
     )
 
 
@@ -63,7 +66,7 @@ class RUMGripper(mjx_env.MjxEnv):
         mj_model.opt.timestep = self.sim_dt
 
         self._mj_model = mj_model
-        self._mjx_model = mjx.put_model(mj_model)
+        self._mjx_model = mjx.put_model(mj_model, impl=self._config.impl)
         self._action_scale = config.action_scale
 
     def _post_init(self):

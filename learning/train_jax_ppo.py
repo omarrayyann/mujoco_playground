@@ -198,11 +198,7 @@ def main(argv):
     # Load environment configuration
     env_cfg = registry.get_default_config(_ENV_NAME.value)
 
-    print(f"Default Environment Config:\n{env_cfg}")
-
     ppo_params = get_rl_config(_ENV_NAME.value)
-
-    print(f"Default PPO Training Parameters:\n{ppo_params}")
 
     if _NUM_TIMESTEPS.present:
         ppo_params.num_timesteps = _NUM_TIMESTEPS.value
