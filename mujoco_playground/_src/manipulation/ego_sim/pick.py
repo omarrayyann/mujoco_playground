@@ -91,8 +91,6 @@ class RUMPickCube(rum.RUMGripper):
             maxval=jp.array([0.20, 0.35, 0.78]),
         )
 
-        target_pos = object_pos.at[2].add(0.05)
-
         init_q = (
             jp.array(self._init_q)
             .at[self._obj_qposadr : self._obj_qposadr + 3]
@@ -118,7 +116,6 @@ class RUMPickCube(rum.RUMGripper):
             "rng": rng,
             "reached_box": 0.0,
             "initial_object_pos": object_pos,
-            "target_pos": target_pos,
             "gripper_pos": gripper_pos,
             "current_grasp": 0.0,
         }
@@ -129,17 +126,14 @@ class RUMPickCube(rum.RUMGripper):
         return state
 
     def step(self, state: State, action: jax.Array) -> State:
-        # Delta Action Application - optimized for JAX without matrix operations
         delta_action = jp.clip(
             action[:6] * self._action_scale, self._lower_deltas, self._upper_deltas
         )
 
-        # current_pos = state.info["gripper_pos"]
         current_pos = state.data.site_xpos[self._gripper_site].copy()
 
         new_position = current_pos + delta_action[:3]
 
-        # Update mocap data in one operation
         data = state.data.replace(
             mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
                 new_position
@@ -178,18 +172,28 @@ class RUMPickCube(rum.RUMGripper):
         return state
 
     def _get_reward(self, data: mjx.Data, info: Dict[str, Any]):
-        target_pos = info["target_pos"]
         box_pos = data.xpos[self._obj_body]
         gripper_pos = data.site_xpos[self._gripper_site]
-        gripper_box = 1 - jp.tanh(5 * jp.linalg.norm(box_pos - gripper_pos))
+
+        dist_gb = jp.linalg.norm(box_pos - gripper_pos)
+        reach = 1 - jp.tanh(5.0 * dist_gb)  # same shape as before
+
         info["reached_box"] = 1.0 * jp.maximum(
-            info["reached_box"],
-            (jp.linalg.norm(box_pos - gripper_pos) < self._distance_threshold),
+            info["reached_box"], (dist_gb < self._distance_threshold)
         )
-        box_target = 1 - jp.tanh(5 * jp.linalg.norm(target_pos - box_pos))
+
+        grasp_norm = (self._upper_grasp - info["current_grasp"]) / (
+            self._upper_grasp - self._lower_grasp + 1e-6
+        )
+        grasp = grasp_norm * (dist_gb < 0.03)
+
+        lift_height = box_pos[2] - info["initial_object_pos"][2]
+        lift = jp.clip((lift_height - 0.015) / 0.055, 0.0, 1.0)
+
         return {
-            "gripper_box": gripper_box,
-            "box_target": box_target * info["reached_box"],
+            "reach": reach,
+            "grasp": grasp,
+            "lift": lift,
         }
 
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
