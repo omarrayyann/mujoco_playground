@@ -25,7 +25,6 @@ from mujoco.mjx._src import math
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from mujoco_playground._src import collision
 from mujoco_playground._src import mjx_env
 from mujoco_playground._src.manipulation.ego_sim.grippers import rum
 from mujoco_playground._src.mjx_env import State  # pylint: disable=g-importing-member
