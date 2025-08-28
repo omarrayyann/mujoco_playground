@@ -385,6 +385,7 @@ def main(argv):
 
     # Load evaluation environment.
     config_overrides = {"impl": _IMPL.value}
+    print(f"OVERRIDING TO: {_IMPL.value}")
     eval_env = None
     if not _VISION.value:
         eval_env = registry.load(
