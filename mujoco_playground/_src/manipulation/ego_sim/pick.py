@@ -41,14 +41,9 @@ def default_config() -> config_dict.ConfigDict:
         action_scale=0.04,
         reward_config=config_dict.create(
             scales=config_dict.create(
-                # Gripper goes to the box.
-                gripper_box=4.0,
-                # Box goes to the target mocap.
-                box_target=20.0,
-                # Do not collide the gripper with the table.
-                no_table_collision=0.25,
-                # Arm stays close to target pose.
-                robot_target_qpos=0.3,
+                reach=2.0,
+                grasp=3.0,
+                lift=6.0,
             )
         ),
         impl="jax",
