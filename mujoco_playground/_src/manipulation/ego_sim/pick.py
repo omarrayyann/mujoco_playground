@@ -103,7 +103,7 @@ class RUMPickCube(rum.RUMGripper):
             self._mj_model,
             qpos=init_q,
             qvel=jp.zeros(self._mjx_model.nv, dtype=float),
-            impl="warp",
+            impl=self._mjx_model.impl.value,
             nconmax=self._config.nconmax,
             njmax=self._config.njmax,
         )
