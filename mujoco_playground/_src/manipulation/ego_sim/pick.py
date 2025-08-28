@@ -38,13 +38,13 @@ def default_config() -> config_dict.ConfigDict:
         sim_dt=0.002,
         episode_length=600,
         action_repeat=1,
-        action_scale=0.02,
+        action_scale=0.04,
         reward_config=config_dict.create(
             scales=config_dict.create(
                 # Gripper goes to the box.
                 gripper_box=4.0,
                 # Box goes to the target mocap.
-                box_target=8.0,
+                box_target=20.0,
                 # Do not collide the gripper with the table.
                 no_table_collision=0.25,
                 # Arm stays close to target pose.
