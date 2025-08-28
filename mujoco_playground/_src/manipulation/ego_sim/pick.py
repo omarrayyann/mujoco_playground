@@ -140,11 +140,11 @@ class RUMPickCube(rum.RUMGripper):
         new_position = current_pos + delta_action[:3]
 
         # Update mocap data in one operation
-        data = state.data.replace(
-            mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
-                new_position
-            ),
-        )
+        # data = state.data.replace(
+        #     mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
+        #         new_position
+        #     ),
+        # )
 
         ctrl_grasp = jp.clip(
             state.info["current_grasp"] + action[-1:] * -0.1,
@@ -153,7 +153,7 @@ class RUMPickCube(rum.RUMGripper):
         )
         state.info.update({"current_grasp": jp.squeeze(ctrl_grasp)})
 
-        data = mjx_env.step(self._mjx_model, data, ctrl_grasp, self.n_substeps)
+        data = mjx_env.step(self._mjx_model, state.data, ctrl_grasp, self.n_substeps)
 
         raw_rewards = self._get_reward(data, state.info)
 
