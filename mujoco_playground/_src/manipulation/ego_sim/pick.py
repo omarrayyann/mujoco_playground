@@ -112,7 +112,9 @@ class RUMPickCube(rum.RUMGripper):
             "reached_box": 0.0,
             "initial_object_pos": object_pos,
             "gripper_pos": gripper_pos,
-            "current_grasp": 0.0,
+            "current_grasp": jp.asarray(
+                0.0, dtype=float
+            ),  # Initialize as a scalar float
         }
 
         obs = self._get_obs(data, info)
@@ -136,11 +138,12 @@ class RUMPickCube(rum.RUMGripper):
         )
 
         ctrl_grasp = jp.clip(
-            state.info["current_grasp"] + action[-1:] * -0.1,
+            state.info["current_grasp"] + jp.squeeze(action[-1:]) * -0.1,
             self._lower_grasp,
             self._upper_grasp,
         )
-        state.info.update({"current_grasp": jp.squeeze(ctrl_grasp)})
+        # Store as a scalar value to avoid dimension issues
+        state.info.update({"current_grasp": jp.asarray(ctrl_grasp, dtype=float)})
 
         data = mjx_env.step(self._mjx_model, data, ctrl_grasp, self.n_substeps)
 
@@ -195,7 +198,7 @@ class RUMPickCube(rum.RUMGripper):
         gripper_pos = data.site_xpos[self._gripper_site]
         obj_pos = data.xpos[self._obj_body]
         rel = obj_pos - gripper_pos
-        current_grasp = jp.array([info["current_grasp"]])
+        current_grasp = jp.array([info["current_grasp"]], dtype=float)
         obs = jp.concatenate([gripper_pos, obj_pos, rel, current_grasp])
         return obs
 
