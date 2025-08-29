@@ -91,7 +91,7 @@ class RUMPickCube(rum.RUMGripper):
             maxval=jp.array([0.20, 0.35, 0.78]),
         )
 
-        target_pos = object_pos.at[2].add(0.1)
+        target_pos = object_pos.at[2].add(0.05)
 
         init_q = (
             jp.array(self._init_q)
