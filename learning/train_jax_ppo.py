@@ -18,6 +18,8 @@ import datetime
 import functools
 import json
 import os
+
+os.environ["MUJOCO_GL"] = "egl"
 import time
 import warnings
 
