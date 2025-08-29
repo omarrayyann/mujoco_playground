@@ -106,7 +106,13 @@ class RUMPickCube(rum.RUMGripper):
             njmax=self._config.njmax,
         )
 
-        data = mjx_env.step(self._mjx_model, data, n_substeps=self.n_substeps)
+        ctrl_grasp = jp.clip(
+            0.0,
+            self._lower_grasp,
+            self._upper_grasp,
+        )
+
+        data = mjx_env.step(self._mjx_model, data, ctrl_grasp, self.n_substeps)
 
         box_pos = data.xpos[self._obj_body].copy()
         target_pos = box_pos.at[2].add(0.05)
