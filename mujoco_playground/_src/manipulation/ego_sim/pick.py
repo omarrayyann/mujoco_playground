@@ -191,7 +191,7 @@ class RUMPickCube(rum.RUMGripper):
         box_pos = data.xpos[self._obj_body]
         gripper_pos = data.site_xpos[self._gripper_site]
 
-        box_target_err = jp.clip(target_pos - box_pos, min=1e-6)
+        box_target_err = jp.clip(jp.linalg.norm(target_pos - box_pos), min=1e-6)
         box_target = 1 - jp.tanh(5 * box_target_err)
         gripper_box_dist = jp.clip(jp.linalg.norm(box_pos - gripper_pos), min=1e-6)
         gripper_box = 1 - jp.tanh(5 * gripper_box_dist)
