@@ -44,7 +44,7 @@ def default_config() -> config_dict.ConfigDict:
                 # Gripper goes to the box.
                 gripper_box=4.0,
                 # Box goes to the target mocap.
-                box_target=10.0,
+                box_target=4.0,
                 # Do not collide the gripper with the table.
                 no_table_collision=0.25,
                 # Arm stays close to target pose.
@@ -79,7 +79,7 @@ class RUMPickCube(rum.RUMGripper):
         self._sample_orientation = sample_orientation
 
         self._reward_scale = jp.array(5.0)
-        self._distance_threshold = jp.array(0.02)
+        self._distance_threshold = jp.array(0.012)
 
     def reset(self, rng: jax.Array) -> State:
         rng, rng_box = jax.random.split(rng, 2)
@@ -90,8 +90,6 @@ class RUMPickCube(rum.RUMGripper):
             minval=jp.array([-0.20, 0.12, 0.78]),
             maxval=jp.array([0.20, 0.35, 0.78]),
         )
-
-        target_pos = object_pos.at[2].add(0.05)
 
         init_q = (
             jp.array(self._init_q)
@@ -107,6 +105,11 @@ class RUMPickCube(rum.RUMGripper):
             nconmax=self._config.nconmax,
             njmax=self._config.njmax,
         )
+
+        data = mjx_env.step(self._mjx_model, data, n_substeps=self.n_substeps)
+
+        box_pos = data.xpos[self._obj_body].copy()
+        target_pos = box_pos.at[2].add(0.05)
 
         gripper_pos = data.site_xpos[self._gripper_site].copy()
 
@@ -181,12 +184,12 @@ class RUMPickCube(rum.RUMGripper):
         target_pos = info["target_pos"]
         box_pos = data.xpos[self._obj_body]
         gripper_pos = data.site_xpos[self._gripper_site]
-        gripper_box = 1 - jp.tanh(5 * jp.linalg.norm(box_pos - gripper_pos))
-        info["reached_box"] = 1.0 * jp.maximum(
-            info["reached_box"],
-            (jp.linalg.norm(box_pos - gripper_pos) < self._distance_threshold),
-        )
-        box_target = 1 - jp.tanh(5 * jp.linalg.norm(target_pos - box_pos))
+
+        box_target_err = jp.clip(target_pos - box_pos, min=1e-6)
+        box_target = 1 - jp.tanh(5 * box_target_err)
+        gripper_box_dist = jp.clip(jp.linalg.norm(box_pos - gripper_pos), min=1e-6)
+        gripper_box = 1 - jp.tanh(5 * gripper_box_dist)
+
         return {
             "gripper_box": gripper_box,
             "box_target": box_target,
