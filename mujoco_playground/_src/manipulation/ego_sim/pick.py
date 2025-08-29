@@ -44,7 +44,7 @@ def default_config() -> config_dict.ConfigDict:
                 # Gripper goes to the box.
                 gripper_box=4.0,
                 # Box goes to the target mocap.
-                box_target=20.0,
+                box_target=10.0,
                 # Do not collide the gripper with the table.
                 no_table_collision=0.25,
                 # Arm stays close to target pose.
@@ -188,8 +188,8 @@ class RUMPickCube(rum.RUMGripper):
         )
         box_target = 1 - jp.tanh(5 * jp.linalg.norm(target_pos - box_pos))
         return {
-            "gripper_box": gripper_box * (1 - info["reached_box"]),
-            "box_target": box_target * info["reached_box"],
+            "gripper_box": gripper_box,
+            "box_target": box_target,
         }
 
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
