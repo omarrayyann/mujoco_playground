@@ -441,71 +441,68 @@ def main(argv):
 
     print("Starting inference...")
 
-    # Create inference function
+    # Create inference function.
     inference_fn = make_inference_fn(params, deterministic=True)
     jit_inference_fn = jax.jit(inference_fn)
 
-    # Prepare for evaluation
-    eval_env = None if _VISION.value else registry.load(_ENV_NAME.value, config=env_cfg)
-    num_envs = 1
-    if _VISION.value:
-        eval_env = env
-        num_envs = env_cfg.vision_config.render_batch_size
+    # Run evaluation rollouts.
+    def do_rollout(rng, state):
+        empty_data = state.data.__class__(
+            **{k: None for k in state.data.__annotations__}
+        )  # pytype: disable=attribute-error
+        empty_traj = state.__class__(
+            **{k: None for k in state.__annotations__}
+        )  # pytype: disable=attribute-error
+        empty_traj = empty_traj.replace(data=empty_data)
 
-    jit_reset = jax.jit(eval_env.reset)
-    jit_step = jax.jit(eval_env.step)
-
-    # Perform multiple rollouts with different random keys
-    num_rollouts = 5
-    base_rng = jax.random.PRNGKey(90)
-
-    for rollout_idx in range(num_rollouts):
-        print(f"Starting rollout {rollout_idx + 1}/{num_rollouts}...")
-
-        # Create different random key for each rollout
-        rng = jax.random.fold_in(base_rng, rollout_idx)
-        rng, reset_rng = jax.random.split(rng)
-        if _VISION.value:
-            reset_rng = jp.asarray(jax.random.split(reset_rng, num_envs))
-        state = jit_reset(reset_rng)
-        state0 = (
-            jax.tree_util.tree_map(lambda x: x[0], state) if _VISION.value else state
-        )
-        rollout = [state0]
-
-        # Run evaluation rollout
-        for _ in range(env_cfg.episode_length):
-            act_rng, rng = jax.random.split(rng)
-            ctrl, _ = jit_inference_fn(state.obs, act_rng)
-            state = jit_step(state, ctrl)
-            state0 = (
-                jax.tree_util.tree_map(lambda x: x[0], state)
-                if _VISION.value
-                else state
+        def step(carry, _):
+            state, rng = carry
+            rng, act_key = jax.random.split(rng)
+            act = jit_inference_fn(state.obs, act_key)[0]
+            state = eval_env.step(state, act)
+            traj_data = empty_traj.tree_replace(
+                {
+                    "data.qpos": state.data.qpos,
+                    "data.qvel": state.data.qvel,
+                    "data.time": state.data.time,
+                    "data.ctrl": state.data.ctrl,
+                    "data.mocap_pos": state.data.mocap_pos,
+                    "data.mocap_quat": state.data.mocap_quat,
+                    "data.xfrc_applied": state.data.xfrc_applied,
+                }
             )
-            rollout.append(state0)
-            if state0.done:
-                break
+            if _VISION.value:
+                traj_data = jax.tree_util.tree_map(lambda x: x[0], traj_data)
+            return (state, rng), traj_data
 
-        # Render and save the rollout
-        render_every = 2
-        fps = 1.0 / eval_env.dt / render_every
-        if rollout_idx == 0:
-            print(f"FPS for rendering: {fps}")
+        _, traj = jax.lax.scan(step, (state, rng), None, length=_EPISODE_LENGTH.value)
+        return traj
 
+    rng = jax.random.split(jax.random.PRNGKey(_SEED.value), _NUM_VIDEOS.value)
+    reset_states = jax.jit(jax.vmap(eval_env.reset))(rng)
+    if _VISION.value:
+        reset_states = jax.tree_util.tree_map(lambda x: x[0], reset_states)
+    traj_stacked = jax.jit(jax.vmap(do_rollout))(rng, reset_states)
+    trajectories = [None] * _NUM_VIDEOS.value
+    for i in range(_NUM_VIDEOS.value):
+        t = jax.tree.map(lambda x, i=i: x[i], traj_stacked)
+        trajectories[i] = [
+            jax.tree.map(lambda x, j=j: x[j], t) for j in range(_EPISODE_LENGTH.value)
+        ]
+
+    # Render and save the rollout.
+    render_every = 2
+    fps = 1.0 / eval_env.dt / render_every
+    print(f"FPS for rendering: {fps}")
+    scene_option = mujoco.MjvOption()
+    scene_option.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = False
+    scene_option.flags[mujoco.mjtVisFlag.mjVIS_PERTFORCE] = False
+    scene_option.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = False
+    for i, rollout in enumerate(trajectories):
         traj = rollout[::render_every]
-
-        scene_option = mujoco.MjvOption()
-        scene_option.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = False
-        scene_option.flags[mujoco.mjtVisFlag.mjVIS_PERTFORCE] = False
-        scene_option.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = False
-
-        frames = eval_env.render(traj, scene_option=scene_option, camera="egocentric")
-        rollout_filename = f"rollout_{rollout_idx + 1}.mp4"
-        media.write_video(rollout_filename, frames, fps=fps)
-        print(f"Rollout video saved as '{rollout_filename}'.")
-
-    print(f"All {num_rollouts} rollout videos completed!")
+        frames = eval_env.render(traj, height=480, width=640, scene_option=scene_option)
+        media.write_video(f"rollout{i}.mp4", frames, fps=fps)
+        print(f"Rollout video saved as 'rollout{i}.mp4'.")
 
 
 if __name__ == "__main__":
