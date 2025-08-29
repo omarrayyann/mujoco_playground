@@ -113,7 +113,7 @@ def brax_ppo_config(
             rl_config.num_timesteps *= 4
             rl_config.num_evals *= 4
     elif env_name.startswith("RUMPickCube"):
-        rl_config.num_timesteps = 100_000
+        rl_config.num_timesteps = 2_000_000
         rl_config.num_evals = 4
         rl_config.unroll_length = 10
         rl_config.num_minibatches = 32
