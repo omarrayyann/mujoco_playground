@@ -99,8 +99,8 @@ class RUMPickCube(rum.RUMGripper):
 
         data = mjx_env.make_data(
             self._mj_model,
-            qpos=init_q,
-            qvel=jp.zeros(self._mjx_model.nv, dtype=float),
+            # qpos=init_q,
+            # qvel=jp.zeros(self._mjx_model.nv, dtype=float),
             impl=self._mjx_model.impl.value,
             nconmax=self._config.nconmax,
             njmax=self._config.njmax,
