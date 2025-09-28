@@ -70,8 +70,7 @@ class RUMGripper(mjx_env.MjxEnv):
         self._action_scale = config.action_scale
 
     def _post_init(self):
-        self._gripper_site = self._mj_model.site("gripper").id
-        self._gripper_base = self._mj_model.body("base").id
+        self._gripper_site = self._mj_model.site("grasping_center").id
         # self._left_finger_geom = self._mj_model.geom("left_finger_pad").id
         # self._right_finger_geom = self._mj_model.geom("right_finger_pad").id
         # self._gripper_body_geom = self._mj_model.geom("gripper_body_collision").id
@@ -86,7 +85,7 @@ class RUMGripper(mjx_env.MjxEnv):
         self._table_geom = self._mj_model.geom("table_top").id
         self._lower_deltas = jp.array([-0.05] * 6)
         self._upper_deltas = jp.array([0.05] * 6)
-        self._lower_grasp = jp.array([-0.8])
+        self._lower_grasp = jp.array([-255.0])
         self._upper_grasp = jp.array([0.0])
         self._init_q = self._mj_model.keyframe("home").qpos
 

@@ -38,7 +38,7 @@ def default_config() -> config_dict.ConfigDict:
         sim_dt=0.002,
         episode_length=600,
         action_repeat=1,
-        action_scale=0.02,
+        action_scale=0.05,
         reward_config=config_dict.create(
             scales=config_dict.create(
                 # Gripper goes to the box.
@@ -53,7 +53,7 @@ def default_config() -> config_dict.ConfigDict:
         ),
         impl="jax",
         nconmax=24 * 8192,
-        njmax=128,
+        njmax=700,
     )
     return config
 
@@ -145,7 +145,6 @@ class RUMPickCube(rum.RUMGripper):
 
         # current_pos = state.info["gripper_pos"]
         current_pos = state.data.site_xpos[self._gripper_site].copy()
-
         new_position = current_pos + delta_action[:3]
 
         # Update mocap data in one operation
@@ -156,7 +155,7 @@ class RUMPickCube(rum.RUMGripper):
         )
 
         ctrl_grasp = jp.clip(
-            state.info["current_grasp"] + action[-1:] * -0.1,
+            0.0,
             self._lower_grasp,
             self._upper_grasp,
         )
@@ -198,7 +197,7 @@ class RUMPickCube(rum.RUMGripper):
 
         return {
             "gripper_box": gripper_box,
-            "box_target": box_target,
+            # "box_target": box_target,
         }
 
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
