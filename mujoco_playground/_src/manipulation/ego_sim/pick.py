@@ -148,11 +148,12 @@ class RUMPickCube(rum.RUMGripper):
         new_position = current_pos + delta_action[:3]
 
         # Update mocap data in one operation
-        data = state.data.replace(
-            mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
-                new_position
-            ),
-        )
+        # data = state.data.replace(
+        #     mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
+        #         new_position
+        #     ),
+        # )
+        data = state.data
 
         ctrl_grasp = jp.clip(
             0.0,
