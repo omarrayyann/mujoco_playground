@@ -503,7 +503,7 @@ def main(argv):
     for i, rollout in enumerate(trajectories):
         traj = rollout[::render_every]
         frames = eval_env.render(
-            traj, height=480, width=640, scene_option=scene_option, camera="egocentric"
+            traj, height=480, width=640, scene_option=scene_option, camera="back_camera"
         )
         media.write_video(f"rollout{i}.mp4", frames, fps=fps)
         print(f"Rollout video saved as 'rollout{i}.mp4'.")
