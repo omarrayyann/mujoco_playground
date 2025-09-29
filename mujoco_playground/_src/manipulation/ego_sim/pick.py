@@ -97,11 +97,8 @@ class RUMPickCube(rum.RUMGripper):
             .set(object_pos)
         )
 
-        mocap_pos = 
-        pos="0 -0.55 0.85" euler="0 0 0"
-
         mocap_pos = jp.array([0.0, -0.55, 0.85])
-        mocap_rot = R.from_euler("xyz", [0,0,1.57]).as_quat()
+        mocap_rot = R.from_euler("xyz", [0, 0, 1.57]).as_quat()
         mocap_quat = jp.array([mocap_rot[3], mocap_rot[0], mocap_rot[1], mocap_rot[2]])
 
         data = mjx_env.make_data(
