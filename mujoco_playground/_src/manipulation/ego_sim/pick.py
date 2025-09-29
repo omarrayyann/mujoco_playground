@@ -98,7 +98,7 @@ class RUMPickCube(rum.RUMGripper):
         )
 
         mocap_pos = jp.array([0.0, -0.55, 0.85])
-        mocap_rot = R.from_euler("xyz", [0, 0, 1.57]).as_quat()
+        mocap_rot = R.from_euler("xyz", [0, 0, 0]).as_quat()
         mocap_quat = jp.array([mocap_rot[3], mocap_rot[0], mocap_rot[1], mocap_rot[2]])
 
         data = mjx_env.make_data(
@@ -154,11 +154,12 @@ class RUMPickCube(rum.RUMGripper):
         new_position = current_pos + delta_action[:3]
 
         # Update mocap data in one operation
-        data = state.data.replace(
-            mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
-                new_position
-            ),
-        )
+        # data = state.data.replace(
+        #     mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
+        #         new_position
+        #     ),
+        # )
+        data = state.data
 
         ctrl_grasp = jp.clip(
             -255.0,
