@@ -218,14 +218,14 @@ class RUMPickCube(rum.RUMGripper):
             | jp.isnan(data.qvel).any()
             | success
         )
-        done = done.astype(float)
 
-        state.info["_steps"] += self._config.action_repeat
         state.info["_steps"] = jp.where(
             done | (state.info["_steps"] >= self._config.episode_length),
             0,
-            state.info["_steps"],
+            state.info["_steps"] + self._config.action_repeat,
         )
+
+        done = done.astype(float)
 
         # Get observations
         obs = self._get_obs(data, state.info)
