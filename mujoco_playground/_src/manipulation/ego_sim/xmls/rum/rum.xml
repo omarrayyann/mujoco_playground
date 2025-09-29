@@ -6,6 +6,7 @@
     <mesh name="gripper_body" file="meshes/gripper_body.stl" scale="0.001 0.001 0.001"/>
     <mesh name="finger" file="meshes/finger.stl" scale="0.001 0.001 0.001"/>
     <mesh name="foam_insert" file="meshes/foam_insert.stl" scale="0.0011 0.0011 0.001"/>
+    <mesh name="iphone" file="meshes/iphone.stl" scale="0.0011 0.0011 0.001"/>
     <mesh name="foam_collision" file="meshes/foam_insert.stl" scale="0.0011 0.00125 0.001"/>
     <material name="white" rgba="1 1 1 1"/>
     <material name="gray" rgba="0.15 0.15 0.15 1"/>
@@ -59,18 +60,18 @@
 
   <worldbody>
 
-    <body name="target_ee_pose" mocap="true" pos="0 -0.55 0.85" euler="0 0 0">
-      <geom name="target_ee_pose" type="box" rgba="0 1 0 1.0" size="0.01 0.01 0.01" conaffinity="0" contype="0"
+    <body name="target_ee_pose" mocap="true" pos="0 -0.45 0.95" euler="0 0 0">
+      <geom name="target_ee_pose" type="box" rgba="0 1 0 0.0" size="0.01 0.01 0.01" conaffinity="0" contype="0"
         mass="10.0"/>
-      <site name="target_ee_pose" pos="0 0 0.0" size="0.01" rgba="0 1 0 1"/>
+      <site name="target_ee_pose" pos="0 0 0.0" size="0.01" rgba="0 1 0 0"/>
     </body>
 
 
     <camera name="top_camera" mode="fixed" fovy="57" pos="0.0 -1.3 1.4" euler="1.0 0 0" resolution="960 720"/>
 
-    <camera name="back_camera" mode="fixed" fovy="60" pos="0.5 0.7 1.2" euler="-1.0 0.5 2.8" resolution="960 720"/>
+    <camera name="back_camera" mode="fixed" fovy="70" pos="0.5 1.0 1.2" euler="-1.0 0.5 2.8" resolution="960 720"/>
 
-    <body name="base" pos="0 -0.55 0.85" euler="0 0 0" gravcomp="1">
+    <body name="base" pos="0 -0.45 0.95" euler="0 0 0" gravcomp="1">
 
       <joint type="free" name="rum_free_joint" armature="0.01" damping="1"/>
 
@@ -81,7 +82,7 @@
         rgba="1 0 0 0"/>
 
       <body name="iphone_body" pos="0 0 0" gravcomp="1">
-        <!-- <geom name="iphone_visual" mesh="iphone" class="visual" material="gray"/> -->
+        <geom name="iphone_visual" mesh="iphone" class="visual" material="gray"/>
 
         <body name="camera_body" pos="0.0 -0.036 0.1" euler="1.309 0 0.0" gravcomp="1">
           <geom type="box" size="0.01 0.01 0.01" rgba="0.1 0.5 0.1 0" contype="0" conaffinity="0"/>
@@ -90,7 +91,7 @@
       </body>
 
       <body name="tcp" pos="0 0.1 0" euler="0 0 0">
-        <site name="grasping_center" pos="0 0 0" size="0.01" rgba="1 0 0 1"/>
+        <site name="grasping_center" pos="0 0 0" size="0.01" rgba="1 0 0 0"/>
       </body>
 
       <body name="fingers" pos="0 0 0.0" gravcomp="1">
