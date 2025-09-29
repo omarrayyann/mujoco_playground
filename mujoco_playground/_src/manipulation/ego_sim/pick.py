@@ -41,16 +41,15 @@ def default_config() -> config_dict.ConfigDict:
         action_scale=0.05,
         reward_config=config_dict.create(
             scales=config_dict.create(
-                # Gripper goes to the box.
-                gripper_box=4.0,
-                # Box goes to the target mocap.
-                box_target=4.0,
-                # Do not collide the gripper with the table.
+                gripper_box=3.0,
+                box_target=6.0,
                 no_table_collision=0.25,
-                # Arm stays close to target pose.
                 robot_target_qpos=0.3,
-            )
+            ),
+            lifted_reward=1.0,
+            success_reward=3.0,
         ),
+        success_threshold=0.03,
         impl="jax",
         nconmax=24 * 8192,
         njmax=700,
@@ -127,15 +126,18 @@ class RUMPickCube(rum.RUMGripper):
 
         metrics = {
             "out_of_bounds": jp.array(0.0, dtype=float),
-            **{k: 0.0 for k in self._config.reward_config.scales.keys()},
+            **{f"reward/{k}": 0.0 for k in self._config.reward_config.scales.keys()},
+            "reward/lifted": jp.array(0.0, dtype=float),
+            "reward/success": jp.array(0.0, dtype=float),
         }
         info = {
             "rng": rng,
-            "reached_box": 0.0,
             "initial_object_pos": object_pos,
             "target_pos": target_pos,
             "gripper_pos": gripper_pos,
             "current_grasp": 0.0,
+            "prev_reward": jp.array(0.0, dtype=float),
+            "_steps": jp.array(0, dtype=int),
         }
 
         obs = self._get_obs(data, info)
@@ -144,6 +146,10 @@ class RUMPickCube(rum.RUMGripper):
         return state
 
     def step(self, state: State, action: jax.Array) -> State:
+        newly_reset = state.info["_steps"] == 0
+        state.info["prev_reward"] = jp.where(
+            newly_reset, 0.0, state.info["prev_reward"]
+        )
         # Delta Action Application - optimized for JAX without matrix operations
         delta_action = jp.clip(
             action[:6] * self._action_scale, self._lower_deltas, self._upper_deltas
@@ -170,20 +176,54 @@ class RUMPickCube(rum.RUMGripper):
         data = mjx_env.step(self._mjx_model, data, ctrl_grasp, self.n_substeps)
 
         raw_rewards = self._get_reward(data, state.info)
+        rewards = {
+            k: v * self._config.reward_config.scales[k] for k, v in raw_rewards.items()
+        }
 
-        reward_values = jp.array(
-            [
-                raw_rewards[k] * self._config.reward_config.scales[k]
-                for k in raw_rewards.keys()
-            ]
+        total_reward = jp.clip(sum(rewards.values()), -1e4, 1e4)
+
+        # Sparse rewards
+        box_pos = data.xpos[self._obj_body]
+        initial_z = state.info["initial_object_pos"][2]
+        lifted = (
+            box_pos[2] > initial_z + 0.02
+        ) * self._config.reward_config.lifted_reward
+        total_reward += lifted
+
+        success = self._get_success(data, state.info)
+        total_reward += success * self._config.reward_config.success_reward
+
+        reward = jp.maximum(
+            total_reward - state.info["prev_reward"], jp.zeros_like(total_reward)
         )
-        reward = jp.clip(jp.sum(reward_values), -1e4, 1e4)
+        state.info["prev_reward"] = jp.maximum(total_reward, state.info["prev_reward"])
+        reward = jp.where(newly_reset, 0.0, reward)
+
+        state.metrics.update({f"reward/{k}": v for k, v in raw_rewards.items()})
+        state.metrics.update(
+            {
+                "reward/lifted": lifted,
+                "reward/success": success,
+            }
+        )
 
         box_pos = data.xpos[self._obj_body]
         out_of_bounds = jp.any(jp.abs(box_pos) > 1.0)
         out_of_bounds |= box_pos[2] < 0.0
-        done = out_of_bounds | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
+        done = (
+            out_of_bounds
+            | jp.isnan(data.qpos).any()
+            | jp.isnan(data.qvel).any()
+            | success
+        )
         done = done.astype(float)
+
+        state.info["_steps"] += self._config.action_repeat
+        state.info["_steps"] = jp.where(
+            done | (state.info["_steps"] >= self._config.episode_length),
+            0,
+            state.info["_steps"],
+        )
 
         # Get observations
         obs = self._get_obs(data, state.info)
@@ -196,20 +236,26 @@ class RUMPickCube(rum.RUMGripper):
         box_pos = data.xpos[self._obj_body]
         gripper_pos = data.site_xpos[self._gripper_site]
 
-        box_target_err = jp.clip(jp.linalg.norm(target_pos - box_pos), min=1e-6)
+        # Dense shaped rewards
+        box_target_dist = jp.linalg.norm(target_pos - box_pos)
+        box_target_err = jp.clip(box_target_dist, min=1e-6)
         box_target = 1 - jp.tanh(5 * box_target_err)
-        gripper_box_dist = jp.clip(jp.linalg.norm(box_pos - gripper_pos), min=1e-6)
-        gripper_box = 1 - jp.tanh(5 * gripper_box_dist)
 
-        info["reached_box"] = 1.0 * jp.maximum(
-            info["reached_box"],
-            (jp.linalg.norm(box_pos - gripper_pos) < 0.012),
-        )
+        gripper_box_dist = jp.linalg.norm(box_pos - gripper_pos)
+        gripper_box_err = jp.clip(gripper_box_dist, min=1e-6)
+        gripper_box = 1 - jp.tanh(5 * gripper_box_err)
 
         return {
             "gripper_box": gripper_box,
-            "box_target": box_target * info["reached_box"],
+            "box_target": box_target,
         }
+
+    def _get_success(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
+        """Check if task is successfully completed."""
+        box_pos = data.xpos[self._obj_body]
+        target_pos = info["target_pos"]
+        dist = jp.linalg.norm(box_pos - target_pos)
+        return dist < self._config.success_threshold
 
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
         gripper_pos = data.site_xpos[self._gripper_site]
