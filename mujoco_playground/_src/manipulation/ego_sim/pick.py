@@ -205,7 +205,7 @@ class RUMPickCube(rum.RUMGripper):
         state.metrics.update(
             {
                 "reward/lifted": lifted,
-                "reward/success": success,
+                "reward/success": success.astype(float),
             }
         )
 
