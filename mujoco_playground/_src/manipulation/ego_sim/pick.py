@@ -191,7 +191,9 @@ class RUMPickCube(rum.RUMGripper):
         total_reward += lifted
 
         success = self._get_success(data, state.info)
-        total_reward += success * self._config.reward_config.success_reward
+        total_reward += (
+            success.astype(float) * self._config.reward_config.success_reward
+        )
 
         reward = jp.maximum(
             total_reward - state.info["prev_reward"], jp.zeros_like(total_reward)
