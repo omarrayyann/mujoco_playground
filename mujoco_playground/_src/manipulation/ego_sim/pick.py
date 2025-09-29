@@ -167,7 +167,7 @@ class RUMPickCube(rum.RUMGripper):
         )
 
         ctrl_grasp = jp.clip(
-            -255.0,
+            -255.0 * action[-1],
             self._lower_grasp,
             self._upper_grasp,
         )
