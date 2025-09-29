@@ -201,9 +201,14 @@ class RUMPickCube(rum.RUMGripper):
         gripper_box_dist = jp.clip(jp.linalg.norm(box_pos - gripper_pos), min=1e-6)
         gripper_box = 1 - jp.tanh(5 * gripper_box_dist)
 
+        info["reached_box"] = 1.0 * jp.maximum(
+            info["reached_box"],
+            (jp.linalg.norm(box_pos - gripper_pos) < 0.012),
+        )
+
         return {
             "gripper_box": gripper_box,
-            # "box_target": box_target,
+            "box_target": box_target * info["reached_box"],
         }
 
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
