@@ -10,7 +10,7 @@
         <flag eulerdamp="disable"/>
     </option> -->
 
-    <option iterations="20" ls_iterations="10" integrator="implicitfast" cone="elliptic" noslip_iterations="2">
+    <option iterations="20" ls_iterations="10" integrator="implicitfast" cone="elliptic">
         <flag eulerdamp="disable"/>
     </option>
 
