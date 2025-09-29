@@ -14,6 +14,7 @@
 # ==============================================================================
 """Train a PPO agent using JAX on the specified environment."""
 
+import numpy as np
 import datetime
 import functools
 import json
@@ -502,12 +503,9 @@ def main(argv):
     scene_option.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = False
     for i, rollout in enumerate(trajectories):
         traj = rollout[::render_every]
-        exo_frames = eval_env.render(
-            traj, height=480, width=640, scene_option=scene_option, camera="back_camera"
-        )
-        ego_frames = eval_env.render(
-            traj, height=480, width=640, scene_option=scene_option, camera="egocentric"
-        )
+        exo_frames = np.array(exo_frames)  # shape: (num_frames, H, W, C)
+        ego_frames = np.array(ego_frames)
+
         frames = jp.concatenate([exo_frames, ego_frames], axis=2)
         media.write_video(f"rollout{i}.mp4", frames, fps=fps)
         print(f"Rollout video saved as 'rollout{i}.mp4'.")
