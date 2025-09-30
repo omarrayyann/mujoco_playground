@@ -39,7 +39,7 @@ def default_config() -> config_dict.ConfigDict:
     return config_dict.create(
         ctrl_dt=0.02,
         sim_dt=0.002,
-        episode_length=200,
+        episode_length=400,
         action_repeat=1,
         action_scale=0.02,
         impl="jax",
