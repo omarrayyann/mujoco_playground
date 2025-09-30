@@ -36,7 +36,7 @@ def default_config() -> config_dict.ConfigDict:
     config = config_dict.create(
         ctrl_dt=0.02,
         sim_dt=0.002,
-        episode_length=500,
+        episode_length=400,
         action_repeat=1,
         action_scale=0.05,
         reward_config=config_dict.create(
@@ -127,6 +127,7 @@ class RUMPickCube(rum.RUMGripper):
         metrics = {
             "out_of_bounds": jp.array(0.0, dtype=float),
             **{f"reward/{k}": 0.0 for k in self._config.reward_config.scales.keys()},
+            "reward/lifted": jp.array(0.0, dtype=float),
             "reward/success": jp.array(0.0, dtype=float),
         }
         info = {
@@ -181,6 +182,14 @@ class RUMPickCube(rum.RUMGripper):
 
         total_reward = jp.clip(sum(rewards.values()), -1e4, 1e4)
 
+        # Sparse rewards
+        box_pos = data.xpos[self._obj_body]
+        initial_z = state.info["initial_object_pos"][2]
+        lifted = (
+            box_pos[2] > initial_z + 0.02
+        ) * self._config.reward_config.lifted_reward
+        total_reward += lifted
+
         success = self._get_success(data, state.info)
         total_reward += (
             success.astype(float) * self._config.reward_config.success_reward
@@ -195,6 +204,7 @@ class RUMPickCube(rum.RUMGripper):
         state.metrics.update({f"reward/{k}": v for k, v in raw_rewards.items()})
         state.metrics.update(
             {
+                "reward/lifted": lifted,
                 "reward/success": success.astype(float),
             }
         )
