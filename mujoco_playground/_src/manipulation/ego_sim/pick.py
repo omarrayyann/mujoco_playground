@@ -36,7 +36,7 @@ def default_config() -> config_dict.ConfigDict:
     config = config_dict.create(
         ctrl_dt=0.02,
         sim_dt=0.002,
-        episode_length=350,
+        episode_length=200,
         action_repeat=1,
         action_scale=0.05,
         reward_config=config_dict.create(
@@ -158,11 +158,18 @@ class RUMPickCube(rum.RUMGripper):
         # current_pos = state.info["gripper_pos"]
         current_pos = state.data.site_xpos[self._gripper_site].copy()
         new_position = current_pos + delta_action[:3]
+        current_rot = state.data.site_xmat[self._gripper_site].copy().reshape(3, 3)
+        new_rotation = current_rot @ euler_to_mat(delta_action[3:6])
+        new_quat = R.from_matrix(new_rotation).as_quat()
+        new_quat = jp.array([new_quat[3], new_quat[0], new_quat[1], new_quat[2]])
 
         # Update mocap data in one operation
         data = state.data.replace(
             mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
                 new_position
+            ),
+            mocap_quat=state.data.mocap_quat.at[self._mocap_controller, :].set(
+                new_quat
             ),
         )
 
