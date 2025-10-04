@@ -54,9 +54,9 @@ class FloatingGripper():
             mocap_pos=data.mocap_pos.at[self.mocap_controller, :].set(
                 new_pos
             ),
-            mocap_quat=data.mocap_quat.at[self.mocap_controller, :].set(
-                new_quat
-            ),
+            # mocap_quat=data.mocap_quat.at[self.mocap_controller, :].set(
+            #     new_quat
+            # ),
         )
         return mjx_env.step(self._mjx_model, data, ctrl_grasp, n_substeps)
 
