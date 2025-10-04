@@ -119,7 +119,7 @@ class EgoPick(mjx_env.MjxEnv):
         )
 
     def reset(self, rng: jax.Array) -> State:
-        # Switch to next gripper configuration
+
         self.current_gripper_index = (self.current_gripper_index + 1) % len(self.available_grippers)
         self._mj_model = self._mj_models[self.current_gripper_index]
         self._mjx_model = self._mjx_models[self.current_gripper_index]
@@ -272,11 +272,13 @@ class EgoPick(mjx_env.MjxEnv):
 
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
         gripper_pos = self.gripper.get_eef_pose(data)[:3, 3]
+        gripper_index = jp.array(self.current_gripper_index, dtype=float)
+        gripper_one_hot = jax.nn.one_hot(gripper_index, len(self.available_grippers))
         obj_pos = data.xpos[self._obj_body]
         rel = obj_pos - gripper_pos
         target_rel = info["target_pos"] - data.xpos[self._obj_body]
-        current_grasp = jp.array([info["current_grasp"]])
-        obs = jp.concatenate([gripper_pos, obj_pos, rel, target_rel, current_grasp])
+        current_grasp = self.gripper.last_grasp_state
+        obs = jp.concatenate([gripper_pos, obj_pos, rel, target_rel, current_grasp, gripper_one_hot, current_grasp])
         return obs
 
     @property

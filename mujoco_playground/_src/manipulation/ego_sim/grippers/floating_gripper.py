@@ -18,6 +18,7 @@ class FloatingGripper():
         self._mjx_model = _mjx_model
         self.lower_deltas = jp.array([-0.05]*6)
         self.upper_deltas = jp.array([0.05]*6)
+        self.last_grasp_state = jp.array([0.0])
         self.post_init()
         return
     
@@ -47,6 +48,7 @@ class FloatingGripper():
         new_quat = mat_to_quat(new_rot)
         # grasp step
         ctrl_grasp = self.gripper_action_to_ctrl(action[6:])
+        self.last_grasp_state = ctrl_grasp
         data = data.replace(
             mocap_pos=data.mocap_pos.at[self.mocap_controller, :].set(
                 new_pos

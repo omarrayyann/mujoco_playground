@@ -31,6 +31,9 @@ class RUMGripper(FloatingGripper):
             action * -255.0, jp.array([-255.0]), jp.array([0.0])
         )
         return ctrl_grasp
+    
+    def get_current_grasp_state(self, data):
+        return data.ctrl[-1]
 
     def post_init(self):
         return super().post_init()
