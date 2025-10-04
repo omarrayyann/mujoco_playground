@@ -48,7 +48,7 @@ _envs = {
     "PandaRobotiqPushCube": robotiq_push_cube.PandaRobotiqPushCube,
     "LeapCubeReorient": leap_cube_reorient.CubeReorient,
     "LeapCubeRotateZAxis": leap_rotate_z.CubeRotateZAxis,
-    "RUMPickCube": rum_pick.RUMPickCube,
+    "EgoPick": rum_pick.EgoPick,
 }
 
 _cfgs = {
@@ -61,7 +61,7 @@ _cfgs = {
     "PandaRobotiqPushCube": robotiq_push_cube.default_config,
     "LeapCubeReorient": leap_cube_reorient.default_config,
     "LeapCubeRotateZAxis": leap_rotate_z.default_config,
-    "RUMPickCube": rum_pick.default_config,
+    "EgoPick": rum_pick.default_config,
 }
 
 _randomizer = {

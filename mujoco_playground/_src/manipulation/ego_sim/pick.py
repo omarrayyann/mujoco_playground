@@ -1,38 +1,18 @@
-# Copyright 2025 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Bring a box to a target and orientation."""
-
 from typing import Any, Dict, Optional, Union
-import jax.lax as lax
-
+import mujoco
 import jax
 import jax.numpy as jp
 from ml_collections import config_dict
 from mujoco import mjx
-from mujoco.mjx._src import math
-import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 from mujoco_playground._src import mjx_env
-from mujoco_playground._src.manipulation.ego_sim.grippers import rum
-from mujoco_playground._src.mjx_env import State  # pylint: disable=g-importing-member
+from mujoco_playground._src.manipulation.ego_sim.grippers.specific_grippers.rum import RUMGripper
+from mujoco_playground._src.mjx_env import State
 from mujoco_playground._src.manipulation.ego_sim.utils import euler_to_mat, mat_to_quat
 
 
 def default_config() -> config_dict.ConfigDict:
-    """Returns the default config for bring_to_target tasks."""
     config = config_dict.create(
         ctrl_dt=0.02,
         sim_dt=0.002,
@@ -57,45 +37,60 @@ def default_config() -> config_dict.ConfigDict:
     return config
 
 
-class RUMPickCube(rum.RUMGripper):
-    """Bring a box to a target."""
+def get_assets() -> Dict[str, bytes]:
+    assets = {}
+    path = mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls"
+    mjx_env.update_assets(assets, path, "*.xml")
+    path = mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "floating_grippers" / "rum"
+    mjx_env.update_assets(assets, path, "*.xml")
+    path = mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "textures"
+    mjx_env.update_assets(assets, path, "*.png")
+    path = mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "floating_grippers" / "rum" / "meshes"
+    mjx_env.update_assets(assets, path, "*.stl")
+    return assets
 
+class EgoPick(mjx_env.MjxEnv):
     def __init__(
         self,
         config: config_dict.ConfigDict = default_config(),
         config_overrides: Optional[Dict[str, Union[str, int, list[Any]]]] = None,
-        sample_orientation: bool = False,
     ):
+        self.config = config
         xml_path = (
             mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "pick_scene.xml"
         )
+        xml = xml_path.read_text()
+        self._model_assets = get_assets()
+        mj_model = mujoco.MjModel.from_xml_string(xml, assets=self._model_assets)
+        mj_model.opt.timestep = self.config.sim_dt
         super().__init__(
-            xml_path,
             config,
             config_overrides,
         )
-        self._post_init()
-        self._sample_orientation = sample_orientation
-
-        self._reward_scale = jp.array(5.0)
-        self._distance_threshold = jp.array(0.012)
-
+        self._mj_model = mj_model
+        self._mjx_model = mjx.put_model(mj_model, impl=self.config.impl)
+        self.gripper = RUMGripper(config, mj_model, self._mjx_model)
+        
     def reset(self, rng: jax.Array) -> State:
         rng, rng_box = jax.random.split(rng, 2)
 
+        self._obj_body = self._mj_model.body("object_body").id
+        self._obj_geom = self._mj_model.geom("object_geom").id
+        self._obj_qposadr = self._mj_model.jnt_qposadr[
+            self._mj_model.body("object_body").jntadr[0]
+        ]
         object_pos = jax.random.uniform(
             rng_box,
             (3,),
             minval=jp.array([-0.20, 0.12, 0.78]),
             maxval=jp.array([0.20, 0.35, 0.78]),
         )
-
+        self._init_q = self.gripper.mj_model.keyframe("home").qpos
         init_q = (
             jp.array(self._init_q)
             .at[self._obj_qposadr : self._obj_qposadr + 3]
             .set(object_pos)
         )
-
         mocap_pos = jp.array([0.0, -0.55, 0.85])
         mocap_rot = R.from_euler("xyz", [0, 0, 0]).as_quat()
         mocap_quat = jp.array([mocap_rot[3], mocap_rot[0], mocap_rot[1], mocap_rot[2]])
@@ -113,8 +108,8 @@ class RUMPickCube(rum.RUMGripper):
 
         ctrl_grasp = jp.clip(
             0.0,
-            self._lower_grasp,
-            self._upper_grasp,
+            self.gripper.grasping_state,
+            self.gripper.non_grasping_state,
         )
 
         data = mjx_env.step(self._mjx_model, data, ctrl_grasp, self.n_substeps)
@@ -122,7 +117,7 @@ class RUMPickCube(rum.RUMGripper):
         box_pos = data.xpos[self._obj_body].copy()
         target_pos = box_pos.at[2].add(0.05)
 
-        gripper_pos = data.site_xpos[self._gripper_site].copy()
+        gripper_pos = self.gripper.get_eef_pose(data)[:3, 3]
 
         metrics = {
             "out_of_bounds": jp.array(0.0, dtype=float),
@@ -150,46 +145,13 @@ class RUMPickCube(rum.RUMGripper):
         state.info["prev_reward"] = jp.where(
             newly_reset, 0.0, state.info["prev_reward"]
         )
-        # Delta Action Application - optimized for JAX without matrix operations
-        delta_action = jp.clip(
-            action[:6] * self._action_scale, self._lower_deltas, self._upper_deltas
-        )
 
-        # current_pos = state.info["gripper_pos"]
-        current_pos = state.data.site_xpos[self._gripper_site].copy()
-        current_rot = state.data.site_xmat[self._gripper_site].copy().reshape(3, 3)
-
-        new_position = current_pos + delta_action[:3]
-        new_rotation = current_rot @ euler_to_mat(delta_action[3:6])
-        new_quat = mat_to_quat(new_rotation)
-
-        # Update mocap data in one operation
-        data = state.data.replace(
-            mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
-                new_position
-            ),
-            mocap_quat=state.data.mocap_quat.at[self._mocap_controller, :].set(
-                new_quat
-            ),
-        )
-
-        ctrl_grasp = jp.clip(
-            -255.0 * action[-1],
-            self._lower_grasp,
-            self._upper_grasp,
-        )
-        state.info.update({"current_grasp": jp.squeeze(ctrl_grasp)})
-
-        data = mjx_env.step(self._mjx_model, data, ctrl_grasp, self.n_substeps)
-
-        raw_rewards = self._get_reward(data, state.info)
+        data = self.gripper.step(state.data, action, self.n_substeps)
+        raw_rewards = self.get_reward(data, state.info)
         rewards = {
             k: v * self._config.reward_config.scales[k] for k, v in raw_rewards.items()
         }
-
         total_reward = jp.clip(sum(rewards.values()), -1e4, 1e4)
-
-        # Sparse rewards
         box_pos = data.xpos[self._obj_body]
         initial_z = state.info["initial_object_pos"][2]
         lifted = (
@@ -201,7 +163,6 @@ class RUMPickCube(rum.RUMGripper):
         total_reward += (
             success.astype(float) * self._config.reward_config.success_reward
         )
-
         reward = jp.maximum(
             total_reward - state.info["prev_reward"], jp.zeros_like(total_reward)
         )
@@ -215,7 +176,6 @@ class RUMPickCube(rum.RUMGripper):
                 "reward/success": success.astype(float),
             }
         )
-
         box_pos = data.xpos[self._obj_body]
         out_of_bounds = jp.any(jp.abs(box_pos) > 1.0)
         out_of_bounds |= box_pos[2] < 0.0
@@ -225,7 +185,6 @@ class RUMPickCube(rum.RUMGripper):
             | jp.isnan(data.qvel).any()
             | success
         )
-
         state.info["_steps"] = jp.where(
             done | (state.info["_steps"] >= self._config.episode_length),
             0,
@@ -233,19 +192,17 @@ class RUMPickCube(rum.RUMGripper):
         )
 
         done = done.astype(float)
-
-        # Get observations
         obs = self._get_obs(data, state.info)
         state = State(data, obs, reward, done, state.metrics, state.info)
 
         return state
 
-    def _get_reward(self, data: mjx.Data, info: Dict[str, Any]):
+    def get_reward(self, data: mjx.Data, info: Dict[str, Any]):
         target_pos = info["target_pos"]
         box_pos = data.xpos[self._obj_body]
-        gripper_pos = data.site_xpos[self._gripper_site]
+        gripper_pose = self.gripper.get_eef_pose(data)
+        gripper_pos = gripper_pose[:3, 3]
 
-        # Dense shaped rewards
         box_target_dist = jp.linalg.norm(target_pos - box_pos)
         box_target_err = jp.clip(box_target_dist, min=1e-6)
         box_target = 1 - jp.tanh(5 * box_target_err)
@@ -260,14 +217,13 @@ class RUMPickCube(rum.RUMGripper):
         }
 
     def _get_success(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
-        """Check if task is successfully completed."""
         box_pos = data.xpos[self._obj_body]
         target_pos = info["target_pos"]
         dist = jp.linalg.norm(box_pos - target_pos)
         return dist < self._config.success_threshold
 
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
-        gripper_pos = data.site_xpos[self._gripper_site]
+        gripper_pos = self.gripper.get_eef_pose(data)[:3, 3]
         obj_pos = data.xpos[self._obj_body]
         rel = obj_pos - gripper_pos
         target_rel = info["target_pos"] - data.xpos[self._obj_body]
@@ -275,13 +231,18 @@ class RUMPickCube(rum.RUMGripper):
         obs = jp.concatenate([gripper_pos, obj_pos, rel, target_rel, current_grasp])
         return obs
 
+    @property
+    def xml_path(self) -> str:
+        return self._xml_path
 
-class RUMPickCubeOrientation(RUMPickCube):
-    """Bring a box to a target and orientation."""
+    @property
+    def action_size(self) -> int:
+        return self.gripper.action_size
 
-    def __init__(
-        self,
-        config: config_dict.ConfigDict = default_config(),
-        config_overrides: Optional[Dict[str, Union[str, int, list[Any]]]] = None,
-    ):
-        super().__init__(config, config_overrides, sample_orientation=True)
+    @property
+    def mj_model(self) -> mujoco.MjModel:
+        return self._mj_model
+
+    @property
+    def mjx_model(self) -> mjx.Model:
+        return self._mjx_model
