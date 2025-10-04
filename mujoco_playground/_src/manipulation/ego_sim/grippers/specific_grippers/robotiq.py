@@ -14,7 +14,7 @@ from mujoco_playground._src.manipulation.ego_sim.grippers.floating_gripper impor
 
 
 
-class RUMGripper(FloatingGripper):
+class RobotiqGripper(FloatingGripper):
     def __init__(
         self,
         config,
@@ -22,13 +22,15 @@ class RUMGripper(FloatingGripper):
         mjx_model
     ):
         super().__init__(config, mj_model, mjx_model)
-        self.name = "rum"
+        self.name = "robotiq"
         self.base_pos = jp.array([0.0, -0.55, 0.9])
-        self.base_rot = jp.array([1.0, 0.0, 0.0, 0.0])
+        self.base_rot = jp.array([0.5, -0.867, 0.0, 0.0])
+
+        pass
 
     def gripper_action_to_ctrl(self, action):
         ctrl_grasp = jp.clip(
-            action * -255.0, jp.array([-255.0]), jp.array([0.0])
+            action * 255.0, jp.array([0.0]), jp.array([255.0])
         )
         return ctrl_grasp
 

@@ -1,10 +1,10 @@
 <mujoco model="scene">
 
-    <include file="floating_grippers/rum/model.xml"/>
+    <include file="floating_grippers/rum/rum.xml"/>
 
     <statistic center="0.2 0 0.2" extent="1.0"/>
 
-    <option iterations="10" ls_iterations="10" integrator="implicitfast" cone="elliptic">
+    <option iterations="20" ls_iterations="10" integrator="implicitfast" cone="elliptic">
         <flag eulerdamp="disable"/>
     </option>
 
@@ -36,6 +36,7 @@
 
     <worldbody>
 
+    <camera name="back_camera" mode="fixed" fovy="70" pos="0.5 1.0 1.2" euler="-1.0 0.5 2.8" resolution="960 720"/>
 
         <!-- <geom name="floor" type="box" pos="0 0 0" size="1.75 1.75 0.05" rgba="1.0 1.0 1.0 1"/>
         <geom name="wall_north" type="box" pos="0 1.75 1" size="1.75 0.02 1" rgba="1.0 1.0 1.0 1"/>

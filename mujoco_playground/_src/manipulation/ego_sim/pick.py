@@ -8,12 +8,18 @@ from scipy.spatial.transform import Rotation as R
 
 from mujoco_playground._src import mjx_env
 from mujoco_playground._src.manipulation.ego_sim.grippers.specific_grippers.rum import RUMGripper
+from mujoco_playground._src.manipulation.ego_sim.grippers.specific_grippers.robotiq import RobotiqGripper
 from mujoco_playground._src.mjx_env import State
 from mujoco_playground._src.manipulation.ego_sim.utils import euler_to_mat, mat_to_quat
 
+gripper_classes = {
+            "robotiq": RobotiqGripper,
+            "rum": RUMGripper,
+        }
 
 def default_config() -> config_dict.ConfigDict:
     config = config_dict.create(
+        gripper="robotiq",
         ctrl_dt=0.02,
         sim_dt=0.002,
         episode_length=400,
@@ -39,14 +45,32 @@ def default_config() -> config_dict.ConfigDict:
 
 def get_assets() -> Dict[str, bytes]:
     assets = {}
+    gripper_names = ["robotiq", "rum"]
+    for name in gripper_names:
+        path = (
+            mjx_env.ROOT_PATH
+            / "manipulation"
+            / "ego_sim"
+            / "xmls"
+            / "floating_grippers"
+            / name
+        )
+        mjx_env.update_assets(assets, path, "*.xml")
+        path = (
+            mjx_env.ROOT_PATH
+            / "manipulation"
+            / "ego_sim"
+            / "xmls"
+            / "floating_grippers"
+            / name
+            / "meshes"
+        )
+        mjx_env.update_assets(assets, path, "*.stl")
+
     path = mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls"
-    mjx_env.update_assets(assets, path, "*.xml")
-    path = mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "floating_grippers" / "rum"
     mjx_env.update_assets(assets, path, "*.xml")
     path = mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "textures"
     mjx_env.update_assets(assets, path, "*.png")
-    path = mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "floating_grippers" / "rum" / "meshes"
-    mjx_env.update_assets(assets, path, "*.stl")
     return assets
 
 class EgoPick(mjx_env.MjxEnv):
@@ -56,22 +80,52 @@ class EgoPick(mjx_env.MjxEnv):
         config_overrides: Optional[Dict[str, Union[str, int, list[Any]]]] = None,
     ):
         self.config = config
-        xml_path = (
+        self.current_gripper_index = 0
+        self.available_grippers = ["robotiq", "rum"]
+        self._xml_path = (
             mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "pick_scene.xml"
         )
-        xml = xml_path.read_text()
+
+        # Pre-create all models and grippers
         self._model_assets = get_assets()
-        mj_model = mujoco.MjModel.from_xml_string(xml, assets=self._model_assets)
-        mj_model.opt.timestep = self.config.sim_dt
+        self._mj_models = []
+        self._mjx_models = []
+        self._grippers = []
+        self._xml_paths = []
+
+        for gripper_name in self.available_grippers:
+            xml_path = (
+                mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "scenes" / f"pick_{gripper_name}_scene.xml"
+            )
+            gripper_xml = xml_path.read_text()
+            mj_model = mujoco.MjModel.from_xml_string(gripper_xml, assets=self._model_assets)
+            mj_model.opt.timestep = self.config.sim_dt
+            mjx_model = mjx.put_model(mj_model, impl=self.config.impl)
+            gripper = gripper_classes[gripper_name](self.config, mj_model, mjx_model)
+            
+            self._mj_models.append(mj_model)
+            self._mjx_models.append(mjx_model)
+            self._grippers.append(gripper)
+            self._xml_paths.append(xml_path)
+
+        self._mj_model = self._mj_models[0]
+        self._mjx_model = self._mjx_models[0]
+        self.gripper = self._grippers[0]
+        self._xml_path = self._xml_paths[0]
+
         super().__init__(
             config,
             config_overrides,
         )
-        self._mj_model = mj_model
-        self._mjx_model = mjx.put_model(mj_model, impl=self.config.impl)
-        self.gripper = RUMGripper(config, mj_model, self._mjx_model)
-        
+
     def reset(self, rng: jax.Array) -> State:
+        # Switch to next gripper configuration
+        self.current_gripper_index = (self.current_gripper_index + 1) % len(self.available_grippers)
+        self._mj_model = self._mj_models[self.current_gripper_index]
+        self._mjx_model = self._mjx_models[self.current_gripper_index]
+        self.gripper = self._grippers[self.current_gripper_index]
+        self._xml_path = self._xml_paths[self.current_gripper_index]
+
         rng, rng_box = jax.random.split(rng, 2)
 
         self._obj_body = self._mj_model.body("object_body").id
@@ -91,9 +145,8 @@ class EgoPick(mjx_env.MjxEnv):
             .at[self._obj_qposadr : self._obj_qposadr + 3]
             .set(object_pos)
         )
-        mocap_pos = jp.array([0.0, -0.55, 0.85])
-        mocap_rot = R.from_euler("xyz", [0, 0, 0]).as_quat()
-        mocap_quat = jp.array([mocap_rot[3], mocap_rot[0], mocap_rot[1], mocap_rot[2]])
+        mocap_pos = self.gripper.base_pos
+        mocap_quat =  self.gripper.base_rot
 
         data = mjx_env.make_data(
             self._mj_model,
@@ -106,12 +159,7 @@ class EgoPick(mjx_env.MjxEnv):
             mocap_quat=mocap_quat,
         )
 
-        ctrl_grasp = jp.clip(
-            0.0,
-            self.gripper.grasping_state,
-            self.gripper.non_grasping_state,
-        )
-
+        ctrl_grasp = jp.zeros(1)
         data = mjx_env.step(self._mjx_model, data, ctrl_grasp, self.n_substeps)
 
         box_pos = data.xpos[self._obj_body].copy()

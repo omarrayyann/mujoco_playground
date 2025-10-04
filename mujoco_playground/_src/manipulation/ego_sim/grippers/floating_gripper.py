@@ -46,10 +46,7 @@ class FloatingGripper():
         new_rot = current_rot @ euler_to_mat(delta_action[3:6])
         new_quat = mat_to_quat(new_rot)
         # grasp step
-        grasp_range_float = (self.grasping_state - self.non_grasping_state)
-        ctrl_grasp = jp.clip(
-            action[6:] * grasp_range_float, self.grasping_state, self.non_grasping_state
-        )
+        ctrl_grasp = self.gripper_action_to_ctrl(action[6:])
         data = data.replace(
             mocap_pos=data.mocap_pos.at[self.mocap_controller, :].set(
                 new_pos
