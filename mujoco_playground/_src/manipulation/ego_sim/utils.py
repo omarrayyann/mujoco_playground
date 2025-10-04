@@ -27,6 +27,26 @@ def euler_to_mat(rpy: jax.Array) -> jax.Array:
         ]
     )
 
+def mat_to_euler(R: jax.Array) -> jax.Array:
+    """Convert rotation matrix to Euler angles - ultra-optimized for JAX."""
+    sy = -R[2, 0]
+    cy = jp.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
+    singular = cy < 1e-6
+
+    # Use jnp.where to avoid branching for better JAX performance
+    x = jp.where(
+        singular,
+        jp.arctan2(-R[1, 2], R[1, 1]),
+        jp.arctan2(R[2, 1], R[2, 2]),
+    )
+    y = jp.arctan2(sy, cy)
+    z = jp.where(
+        singular,
+        0.0,
+        jp.arctan2(R[1, 0], R[0, 0]),
+    )
+
+    return jp.array([x, y, z])
 
 def mat_to_quat(R: jax.Array) -> jax.Array:
     """Convert rotation matrix to quaternion - ultra-optimized for JAX."""

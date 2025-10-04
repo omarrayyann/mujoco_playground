@@ -10,7 +10,7 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.manipulation.ego_sim.grippers.specific_grippers.rum import RUMGripper
 from mujoco_playground._src.manipulation.ego_sim.grippers.specific_grippers.robotiq import RobotiqGripper
 from mujoco_playground._src.mjx_env import State
-from mujoco_playground._src.manipulation.ego_sim.utils import euler_to_mat, mat_to_quat
+from mujoco_playground._src.manipulation.ego_sim.utils import euler_to_mat, mat_to_quat, mat_to_euler
 
 gripper_classes = {
             "robotiq": RobotiqGripper,
@@ -81,7 +81,7 @@ class EgoPick(mjx_env.MjxEnv):
     ):
         self.config = config
         self.current_gripper_index = 0
-        self.available_grippers = ["robotiq", "rum"]
+        self.available_grippers = ["rum", "robotiq"]
         self._xml_path = (
             mjx_env.ROOT_PATH / "manipulation" / "ego_sim" / "xmls" / "pick_scene.xml"
         )
@@ -272,13 +272,15 @@ class EgoPick(mjx_env.MjxEnv):
 
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
         gripper_pos = self.gripper.get_eef_pose(data)[:3, 3]
+        gripper_quat = self.gripper.get_eef_pose(data)[:3, :3]
+        gripper_euler = mat_to_euler(gripper_quat)
         gripper_index = jp.array(self.current_gripper_index, dtype=float)
         gripper_one_hot = jax.nn.one_hot(gripper_index, len(self.available_grippers))
         obj_pos = data.xpos[self._obj_body]
         rel = obj_pos - gripper_pos
         target_rel = info["target_pos"] - data.xpos[self._obj_body]
         current_grasp = self.gripper.last_grasp_state
-        obs = jp.concatenate([gripper_pos, obj_pos, rel, target_rel, current_grasp, gripper_one_hot, current_grasp])
+        obs = jp.concatenate([gripper_pos, gripper_euler, obj_pos, rel, target_rel, current_grasp, gripper_one_hot, current_grasp])
         return obs
 
     @property

@@ -30,7 +30,7 @@ class RobotiqGripper(FloatingGripper):
 
     def gripper_action_to_ctrl(self, action):
         ctrl_grasp = jp.clip(
-            action * 255.0, jp.array([0.0]), jp.array([255.0])
+            action * 0.82, jp.array([0.0]), jp.array([0.82])
         )
         return ctrl_grasp
 
