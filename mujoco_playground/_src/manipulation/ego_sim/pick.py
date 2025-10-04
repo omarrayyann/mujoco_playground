@@ -157,12 +157,19 @@ class RUMPickCube(rum.RUMGripper):
 
         # current_pos = state.info["gripper_pos"]
         current_pos = state.data.site_xpos[self._gripper_site].copy()
+        current_rot = state.data.site_xmat[self._gripper_site].copy().reshape(3, 3)
+
         new_position = current_pos + delta_action[:3]
+        new_rotation = current_rot @ euler_to_mat(delta_action[3:6])
+        new_quat = mat_to_quat(new_rotation)
 
         # Update mocap data in one operation
         data = state.data.replace(
             mocap_pos=state.data.mocap_pos.at[self._mocap_controller, :].set(
                 new_position
+            ),
+            mocap_quat=state.data.mocap_quat.at[self._mocap_controller, :].set(
+                new_quat
             ),
         )
 
